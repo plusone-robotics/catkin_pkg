@@ -88,7 +88,7 @@ class VcsClientBase(object):
     def get_latest_tag_name(self):
         raise NotImplementedError()
 
-    def get_log_entries(self, from_tag, to_tag, skip_merges=False):
+    def get_log_entries(self, from_tag, to_tag, skip_merges=False, only_merges=False):
         raise NotImplementedError()
 
     def replace_repository_references(self, line):
@@ -179,14 +179,23 @@ class GitClient(VcsClientBase):
         tag_name = result_describe['output']
         return tag_name
 
-    def get_log_entries(self, from_tag, to_tag, skip_merges=False):
+    def get_log_entries(self, from_tag, to_tag, skip_merges=False, only_merges=False):
         # query all hashes in the range
+        MSG_ERR_OPTIONS_MERGE_CONTRADICT = 'Both "skip_merges" and "only_merges" are set to True, which contradicts.'
         cmd = [self._executable, 'log']
         if from_tag or to_tag:
             cmd.append('%s%s' % ('%s..' % to_tag if to_tag else '', from_tag if from_tag else ''))
         cmd.append('--format=format:%H')
         if skip_merges:
-            cmd.append('--no-merges')
+            if not only_merges:
+                cmd.append('--no-merges')
+            else:
+                raise RuntimeError(MSG_ERR_OPTIONS_MERGE_CONTRADICT)
+        if only_merges:
+            if not skip_merges:
+                cmd.append('--merges')
+            else:
+                raise RuntimeError(MSG_ERR_OPTIONS_MERGE_CONTRADICT)
         result = self._run_command(cmd)
         if result['returncode']:
             raise RuntimeError('Could not fetch commit hashes:\n%s' % result['output'])
@@ -348,7 +357,7 @@ class HgClient(VcsClientBase):
             raise RuntimeError('Could not find latest tagn')
         return tag_name
 
-    def get_log_entries(self, from_tag, to_tag, skip_merges=False):
+    def get_log_entries(self, from_tag, to_tag, skip_merges=False, only_merges=False):
         # query all hashes in the range
         # ascending chronological order since than it is easier to handle empty tag names
         revrange = '%s:%s' % ((to_tag if to_tag else ''), (from_tag if from_tag else 'tip'))
