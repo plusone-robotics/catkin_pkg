@@ -186,16 +186,12 @@ class GitClient(VcsClientBase):
         if from_tag or to_tag:
             cmd.append('%s%s' % ('%s..' % to_tag if to_tag else '', from_tag if from_tag else ''))
         cmd.append('--format=format:%H')
+        if skip_merges and only_merges:
+            raise RuntimeError(MSG_ERR_OPTIONS_MERGE_CONTRADICT)
         if skip_merges:
-            if not only_merges:
-                cmd.append('--no-merges')
-            else:
-                raise RuntimeError(MSG_ERR_OPTIONS_MERGE_CONTRADICT)
+            cmd.append('--no-merges')
         if only_merges:
-            if not skip_merges:
-                cmd.append('--merges')
-            else:
-                raise RuntimeError(MSG_ERR_OPTIONS_MERGE_CONTRADICT)
+            cmd.append('--merges')
         result = self._run_command(cmd)
         if result['returncode']:
             raise RuntimeError('Could not fetch commit hashes:\n%s' % result['output'])
